@@ -17,10 +17,14 @@ import {
   Tabs,
 } from 'react-native-router-flux'
 
+import { Provider } from 'mobx-react'
+
 import Icon from './src/components/Icon/Index'
 
 import Home from './src/pages/Home'
 import Message from './src/pages/Message'
+
+import store from './src/store/Index'
 
 const TabBarIcon = ({ name, active }: { name: string, active: boolean}) => {
   return (
@@ -34,28 +38,30 @@ const TabBarIcon = ({ name, active }: { name: string, active: boolean}) => {
 
 const App = () => {
   return (
-    <Router>
-      <Overlay key='overlay'>
-        <Tabs
-          key='root'
-          showLabel={false}
-        >
-          <Scene
-            key='home'
-            initial
-            hideNavBar
-            icon={({focused}) => <TabBarIcon name='water' active={focused} />}
-            component={Home}
-          />
-          <Scene
-            key='message'
-            hideNavBar
-            icon={({focused}) => <TabBarIcon name='message' active={focused} />}
-            component={Message}
-          />
-        </Tabs>
-      </Overlay>
-    </Router>
+    <Provider {...store}>
+      <Router>
+        <Overlay key='overlay'>
+          <Tabs
+            key='root'
+            showLabel={false}
+          >
+            <Scene
+              key='home'
+              initial
+              hideNavBar
+              icon={({focused}) => <TabBarIcon name='water' active={focused} />}
+              component={Home}
+            />
+            <Scene
+              key='message'
+              hideNavBar
+              icon={({focused}) => <TabBarIcon name='message' active={focused} />}
+              component={Message}
+            />
+          </Tabs>
+        </Overlay>
+      </Router>
+    </Provider>
   );
 };
 

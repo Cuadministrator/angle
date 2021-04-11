@@ -1,11 +1,25 @@
 import { observable, action, makeObservable, configure, runInAction, autorun } from 'mobx'
 
 import net from 'net'
-import { Server, Socket } from 'net'
+import { Socket } from 'net'
+import { Server } from 'net'
+
+import { getIpAddress } from 'react-native-device-info'
 
 export interface Message {
   type: 'client' | 'server'
   text: string
+}
+
+const STATE_NORMAL = 0
+const STATE_WARING = 1
+const STATE_ERROR = 2
+
+const STATUS_MAPPING = {
+  [STATE_NORMAL]: '正常水位',
+  [STATE_WARING]: '预警水位',
+  [STATE_ERROR]: '危险水位',
+  default: '错误的水位状态'
 }
 
 configure({
@@ -16,17 +30,12 @@ export class Global {
   constructor() {
       makeObservable(this)
   }
-  @observable server: Server | null = null // new net.Server()
+  @observable server: Server | null = null
+  @observable socket: Socket | null = null
   @observable connecting = false
   @observable ip = '127.0.0.1'
   @observable port = '9999'
   @observable connectLoading = false
-
-  @observable client: Socket | null = null
-  @observable clientConnecting = false
-  @observable clientIp = '192.168.31.141'
-  @observable clientPort = '1234'
-  @observable clientConnectLoading = false
 
   @observable message: Message[] = []
 
@@ -37,18 +46,23 @@ export class Global {
   }
 
   @action
-  changeClientIpPort(ip, port) {
-    this.clientIp = ip
-    this.clientPort = port
+  async initIp() {
+    // 获取本地 ip
+    await getIpAddress().then(res => {
+      runInAction(() => {
+        this.ip = res
+      })
+    })
   }
 
   @action
-  initServer() {
+  async initServer() {
     const server = new net.Server()
     this.connectLoading = false
     server.on('connection', (socket) => {
       socket.write('Echo server')
       runInAction(() => {
+        this.socket = socket
         this.connecting = true
         this.connectLoading = false
       })
@@ -56,26 +70,36 @@ export class Global {
 
     server.on('connection', (socket) => {
       runInAction(() => {
-        this.message = [...this.message, { type: 'server', text: 'Client connected to server on ' + JSON.stringify(socket.address())}]
+        this.message = [{ type: 'server', text: 'Client connected to server on ' + JSON.stringify(socket.address())}, ...this.message]
       })
 
       socket.on('data', (data) => {
         runInAction(() => {
-          if (data.toString()) {
-            this.message = [...this.message, { type: 'client', text: data.toString() }]
+          let str = ''
+          if (typeof data !== 'string') {
+            const arr = new Uint16Array(data).toString().split(',')
+            if (arr.length === 8) {
+              str = STATUS_MAPPING[arr[arr.length - 2]]
+            }
+          } else {
+            str = data
+          }
+          console.warn(typeof str, str)
+          if (str) {
+            this.message = [{ type: 'client', text: str }, ...this.message]
           }
         })
       })
 
       socket.on('error', (error) => {
         runInAction(() => {
-          this.message = [...this.message, { type: 'client', text: JSON.stringify(error) }]
+          this.message = [{ type: 'server', text: `Connection error ${JSON.stringify(error) || ''}`}, ...this.message]
         })
       })
 
       socket.on('close', (error) => {
         runInAction(() => {
-          this.message = [...this.message, { type: 'client', text: JSON.stringify(error) }]
+          this.message = [{ type: 'server', text: `Connection closed ${JSON.stringify(error) || ''}`}, ...this.message]
         })
       })
     })
@@ -83,13 +107,13 @@ export class Global {
     server.on('error', (error) => {
       runInAction(() => {
         this.connectLoading = false
-        this.message = [...this.message, { type: 'server', text: 'Server error ' + error }]
+        this.message = [{ type: 'server', text: 'Server error ' + error }, ...this.message]
       })
     })
 
     server.on('close', () => {
       runInAction(() => {
-        this.message = [...this.message, { type: 'server', text: 'Server closed' }]
+        this.message = [{ type: 'server', text: 'Server closed' }, ...this.message]
       })
     })
 
@@ -97,42 +121,13 @@ export class Global {
   }
 
   @action
-  initClient() {
-    let client = new net.Socket()
-    this.clientConnecting = false
-
-    client.setKeepAlive(true)
-
-    client.on('connect', () => {
-      runInAction(() => {
-        this.clientConnecting = true
-        this.clientConnectLoading = false
-        this.message = [...this.message, { type: 'server', text: 'connected to server!' }]
-      })
-    })
-    client.on('data', (data) => {
-      runInAction(() => {
-        this.message = [...this.message, { type: 'client', text: data.toString() }]
-      })
-    });
-
-    client.on('close', () => {
-      runInAction(() => {
-        console.warn('Client connect closed')
-        this.clientConnecting = false
-        this.message = [...this.message, { type: 'server', text: 'connection closed' }]
-      })
-    })
-
-    this.client = client
-  }
-
-  @action
-  create() {
+  async create() {
     // 如果正在连接中中断再创建新的连接
     if (this.connecting || this.connectLoading) return
-    this.initServer()
-    this.connectLoading = true
+    await this.initServer()
+    runInAction(() => {
+      this.connectLoading = true
+    })
     this.server?.listen({ host: this.ip, port: parseInt(this.port, 0), reuseAddress: true })
   }
 
@@ -146,36 +141,8 @@ export class Global {
           })
         })
       } catch (err) {
-        this.message = [...this.message, { type: 'server', text: 'There are still connections that cannot be terminated'} ]
+        this.message = [{ type: 'server', text: 'There are still connections that cannot be terminated'}, ...this.message]
       }
-    }
-  }
-
-  @action
-  connect() {
-    if (this.clientConnectLoading || this.clientConnecting) return
-    this.initClient()
-    this.clientConnectLoading = true
-    this.client?.connect({
-      host: this.clientIp,
-      port: parseInt(this.clientPort),
-    }, () => {
-      runInAction(() => {
-        this.clientConnecting = true
-        this.clientConnectLoading = false
-      })
-      this.client?.write('Hello, server! Love, Client.')
-    })
-  }
-
-  @action
-  destroy() {
-    if (this.client && this.clientConnecting) {
-      this.client.end('close', undefined, () => {
-        runInAction(() => {
-          this.clientConnecting = false
-        })
-      })
     }
   }
 }

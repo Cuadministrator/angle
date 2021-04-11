@@ -19,13 +19,16 @@
 
 import { inject, observer } from 'mobx-react'
 
- import {
-   Input,
-   Overlay,
-   ListItem,
-   Button,
-   Card,
- } from 'react-native-elements'
+import {
+  Input,
+  Overlay,
+  ListItem,
+  Button,
+  Card,
+} from 'react-native-elements'
+
+import Toast from '../components/Toast/Index'
+
 import { Global } from '@src/store/Index';
 
 const Home = ({global}: {global: Global}) => {
@@ -33,15 +36,9 @@ const Home = ({global}: {global: Global}) => {
   const [port, setPort] = useState('')
   const [isVisible, setIsVisible] = useState(false)
 
-  const [clientIp, setClientIp] = useState('')
-  const [clientPort, setClientPort] = useState('')
-  const [clientIsVisible, setClientIsVisible] = useState(false)
-
+  useEffect(() => {global.initIp()}, [global.initIp])
   const onIpChange = useCallback((text) => { setIp(text) }, [])
   const onPortChange = useCallback((text) => { setPort(text) }, [])
-
-  const onClientIpChange = useCallback((text) => { setClientIp(text) }, [])
-  const onClientPortChange = useCallback((text) => { setClientPort(text) }, [])
 
   const openOverlay = useCallback(() => {
     setIsVisible(true)
@@ -51,23 +48,10 @@ const Home = ({global}: {global: Global}) => {
     setIsVisible(false)
   }, [])
 
-  const openClientOverlay = useCallback(() => {
-    setClientIsVisible(true)
-  }, [])
-
-  const closeClientOverlay = useCallback(() => {
-    setClientIsVisible(false)
-  }, [])
-
   const confirm = useCallback(() => {
     global.changeIpPort(ip || global.ip, port || global.port)
     closeOverlay()
   }, [ip, port, closeOverlay, global.ip, global.port])
-
-  const clientConfirm = useCallback(() => {
-    global.changeClientIpPort(clientIp || global.clientIp, clientPort || global.clientPort)
-    closeClientOverlay()
-  }, [clientPort, clientIp, closeClientOverlay, global.clientIp, global.clientPort])
 
   const serverOpts = useCallback(() => {
     if (global.connecting) {
@@ -77,13 +61,18 @@ const Home = ({global}: {global: Global}) => {
     }
   }, [global.create])
 
-  const clientOpts = useCallback(() => {
-    if (global.clientConnecting) {
-      global.destroy()
-    } else {
-      global.connect()
-    }
-  }, [])
+  const optBtn = useCallback(
+    () => {
+      try {
+        global.socket?.write('water injection', undefined, () => {
+          Toast.show('已成功发送消息')
+        })
+      } catch (e) {
+        Toast.show('当前连接中断')
+      }
+    },
+    [global.socket],
+  )
 
   return (
     <SafeAreaView style={classes.page}>
@@ -96,96 +85,61 @@ const Home = ({global}: {global: Global}) => {
       <View style={classes['input-box']}>
         <Card containerStyle={classes.card}>
           <Card.Title>服务端</Card.Title>
-          <Card.Divider />
-          <ListItem bottomDivider onPress={openOverlay}>
+          <ListItem bottomDivider topDivider>
             <ListItem.Input
               label='ip'
               value={global.ip}
               placeholder='0.0.0.0'
+              inputStyle={{paddingTop: 0, top: -6}}
             />
           </ListItem>
-          <ListItem onPress={openOverlay}>
+          <ListItem
+            onPress={openOverlay}
+          >
             <ListItem.Input
               label='端口'
               value={global.port}
               placeholder='0'
+              inputStyle={{paddingTop: 0, top: -6}}
             />
           </ListItem>
         </Card>
-        <Card containerStyle={classes.card}>
-          <Card.Title>客户端</Card.Title>
-          <Card.Divider />
-          <ListItem bottomDivider onPress={openClientOverlay}>
-            <ListItem.Input
-              label='ip'
-              value={global.clientIp}
-              placeholder='0.0.0.0'
-            />
-          </ListItem>
-          <ListItem onPress={openClientOverlay}>
-            <ListItem.Input
-              label='端口'
-              value={global.clientPort}
-              placeholder='0'
-            />
-          </ListItem>
-        </Card>
-        <Overlay
-          isVisible={isVisible}
-          overlayStyle={classes.overlay}
-        >
-          <Input
-            label='ip'
-            containerStyle={classes['overlay-input']}
-            value={ip || global.ip}
-            placeholder='0.0.0.0'
-            onChangeText={onIpChange}
-          />
-          <Input
-            label='端口'
-            containerStyle={classes['overlay-input']}
-            value={port || global.port}
-            placeholder='0'
-            onChangeText={onPortChange}
-          />
-          <Button title='确定' onPress={confirm} />
-        </Overlay>
-        <Overlay
-          isVisible={clientIsVisible}
-          overlayStyle={classes.overlay}
-        >
-          <Input
-            label='ip'
-            containerStyle={classes['overlay-input']}
-            value={clientIp || global.clientIp}
-            placeholder='0.0.0.0'
-            onChangeText={onClientIpChange}
-          />
-          <Input
-            label='端口'
-            containerStyle={classes['overlay-input']}
-            value={clientPort || global.clientPort}
-            placeholder='0'
-            onChangeText={onClientPortChange}
-          />
-          <Button title='确定' onPress={clientConfirm} />
-        </Overlay>
       </View>
       <View style={classes.buttons}>
         <Button
-          title={global.connecting ? '已连接' : '连接'}
+          title={global.connecting ? '已开启' : '开启'}
           containerStyle={classes['btn']}
           loading={global.connectLoading}
           onPress={serverOpts}
         />
         <Button
-          title={global.clientConnecting ? '分闸' : '合闸'}
+          title='注水'
           containerStyle={classes['btn']}
-          loading={global.clientConnectLoading}
-          onPress={clientOpts}
+          loading={false}
+          onPress={optBtn}
         />
       </View>
     </View>
+    <Overlay
+      isVisible={isVisible}
+      overlayStyle={classes.overlay}
+    >
+      <Input
+        label='ip'
+        containerStyle={classes['overlay-input']}
+        value={ip}
+        placeholder='0.0.0.0'
+        onChangeText={onIpChange}
+      />
+      <Input
+        label='端口'
+        containerStyle={classes['overlay-input']}
+        value={port}
+        placeholder='0'
+        onChangeText={onPortChange}
+      />
+      <Button title='确定' onPress={confirm} />
+    </Overlay>
     </SafeAreaView>
   );
 };
@@ -193,6 +147,7 @@ const Home = ({global}: {global: Global}) => {
  const classes = StyleSheet.create({
   page: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   content: {
     paddingTop: 40,
@@ -223,22 +178,6 @@ const Home = ({global}: {global: Global}) => {
     paddingHorizontal: 0,
     paddingBottom: 0,
     overflow: 'hidden',
-  },
-  row: {
-    width: '100%',
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 70
-  },
-  'row-text': {
-    width: 50,
-    fontSize: 16,
-    color: '#333',
-  },
-  input: {
-    width: 'auto',
-    flex: 1,
   },
   buttons: {
     marginTop: 50,

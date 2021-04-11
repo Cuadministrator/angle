@@ -25,20 +25,13 @@ import { ListItem } from 'react-native-elements'
 import { Global } from '@src/store/Index';
 
 const Messages = ({global}: { global: Global }) => {
-  const scrollRef = useRef<ScrollView>()
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollToEnd({animated: true})
-    }
-  }, [global.message])
-
   return (
     <SafeAreaView style={classes.page}>
       <StatusBar barStyle='light-content' />
     <View style={classes['title-box']}>
       <Text style={classes.title}>消息</Text>
     </View>
-    <ScrollView ref={scrollRef} style={classes['scroll-view']} snapToEnd>
+    <ScrollView style={classes['scroll-view']} snapToEnd>
       {
         global.message?.map((item, index) => (
           <ListItem

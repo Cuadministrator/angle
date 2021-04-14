@@ -50,7 +50,7 @@ export class Global {
     // 获取本地 ip
     await getIpAddress().then(res => {
       runInAction(() => {
-        this.ip = res
+        this.ip = res || '127.0.0.1'
       })
     })
   }
@@ -84,7 +84,6 @@ export class Global {
           } else {
             str = data
           }
-          console.warn(typeof str, str)
           if (str) {
             this.message = [{ type: 'client', text: str }, ...this.message]
           }

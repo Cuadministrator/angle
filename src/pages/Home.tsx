@@ -31,6 +31,8 @@ import Toast from '../components/Toast/Index'
 
 import { Global } from '@src/store/Index';
 
+const INJECTING_WATER= new Uint8Array([0x68, 0x04, 0x68, 0x11, 0x00, 0x00, 0x01, 0x16])
+
 const Home = ({global}: {global: Global}) => {
   const [ip, setIp] = useState('')
   const [port, setPort] = useState('')
@@ -64,7 +66,7 @@ const Home = ({global}: {global: Global}) => {
   const optBtn = useCallback(
     () => {
       try {
-        global.socket?.write('water injection', undefined, () => {
+        global.socket?.write(INJECTING_WATER, undefined, () => {
           Toast.show('已成功发送消息')
         })
       } catch (e) {
@@ -85,7 +87,7 @@ const Home = ({global}: {global: Global}) => {
       <View style={classes['input-box']}>
         <Card containerStyle={classes.card}>
           <Card.Title>服务端</Card.Title>
-          <ListItem bottomDivider topDivider>
+          <ListItem bottomDivider topDivider onPress={openOverlay}>
             <ListItem.Input
               label='ip'
               value={global.ip}
@@ -93,9 +95,7 @@ const Home = ({global}: {global: Global}) => {
               inputStyle={{paddingTop: 0, top: -6}}
             />
           </ListItem>
-          <ListItem
-            onPress={openOverlay}
-          >
+          <ListItem onPress={openOverlay}>
             <ListItem.Input
               label='端口'
               value={global.port}
